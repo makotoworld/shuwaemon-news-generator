@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 
 # アプリケーション設定
 APP_TITLE = "しゅわえもんニュース生成システム"
-DATA_FILE = "shuwaemon_news_data.xlsx"  # Excelデータファイル
+DATA_FILE = "data/shuwaemon_news_data.xlsx"  # Excelデータファイル
 HISTORY_FILE = "api_usage_history.json"  # API使用履歴
 OUTPUT_DIR = "generated_articles"        # 生成記事の保存ディレクトリ
 
@@ -33,6 +33,9 @@ MODEL_NAME = "gemini-1.5-pro"  # または "gemini-1.0-pro"など他のモデル
 async def lifespan(app: FastAPI):
     # 起動時の処理
     Path(OUTPUT_DIR).mkdir(exist_ok=True)
+    Path("static").mkdir(exist_ok=True)
+    Path("data").mkdir(exist_ok=True)
+
     if not os.path.exists(DATA_FILE):
         print(f"警告: データファイル '{DATA_FILE}' が見つかりません")
     if not API_KEY:
