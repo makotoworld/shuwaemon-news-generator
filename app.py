@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 
 # アプリケーション設定
 APP_TITLE = "しゅわえもんニュース生成システム"
-DATA_FILE = "shuwaimon_news_data.xlsx"  # Excelデータファイル
+DATA_FILE = "shuwaemon_news_data.xlsx"  # Excelデータファイル
 HISTORY_FILE = "api_usage_history.json"  # API使用履歴
 OUTPUT_DIR = "generated_articles"        # 生成記事の保存ディレクトリ
 
