@@ -1,112 +1,128 @@
 # しゅわえもんニュース生成システム
 
-[![CI/CD Pipeline](https://github.com/yourusername/shuwaemon-news-generator/actions/workflows/cicd.yml/badge.svg)](https://github.com/yourusername/shuwaemon-news-generator/actions/workflows/cicd.yml)
-[![codecov](https://codecov.io/gh/yourusername/shuwaemon-news-generator/branch/main/graph/badge.svg)](https://codecov.io/gh/yourusername/shuwaemon-news-generator)
-
-YouTubeチャンネル「しゅわえもん」のニュース記事をGoogle Gemini APIを使って自動生成するウェブアプリケーション。
+YouTubeチャンネル「しゅわえもん」のコンテンツを分析し、Gemini AIを使って記事を自動生成するシステムです。
 
 ## 機能
 
-- キーワードベースでのニュース記事生成
-- Excelデータからの関連コンテンツ抽出
-- API使用量と料金の追跡
-- しゅわえもんスタイルの記事フォーマット
+- YouTubeチャンネルからのデータ抽出・解析
+- Gemini APIを使用した記事の自動生成
+- Web UIとCLIの両方のインターフェース
+- 生成コストとトークン使用量の追跡
 
-## プロジェクト構造
+## 必要条件
 
-```
-shuwaemon-news-generator/
-├── app.py                      # メインアプリケーション
-├── setup.py                    # パッケージ設定
-├── requirements.txt            # 依存関係
-├── .github/
-│   └── workflows/
-│       └── cicd.yml            # GitHub Actions設定
-├── tests/
-│   ├── __init__.py
-│   ├── test_app.py             # アプリケーションテスト
-│   └── conftest.py             # pytestの設定
-├── static/
-│   └── css/
-│       └── styles.css          # スタイルシート
-├── templates/                  # Jinja2テンプレート
-│   ├── base.html
-│   ├── index.html
-│   ├── result.html
-│   ├── history.html
-│   └── error.html
-├── generated_articles/         # 生成された記事
-└── data/
-    └── shuwaimon_news_data.xlsx # ソースデータ
-```
+- Python 3.10以上
+- Google API Key (Gemini APIとYouTube Data API)
 
-## 開発環境のセットアップ
+## インストール
 
-### 前提条件
-
-- Python 3.8以上
-- pipまたはpipenv
-
-### インストール手順
+### 1. リポジトリのクローン
 
 ```bash
-# リポジトリのクローン
 git clone https://github.com/yourusername/shuwaemon-news-generator.git
 cd shuwaemon-news-generator
-
-# 依存関係のインストール
-pip install -e ".[dev]"
-# または: 
-# pip install -r requirements.txt
-# pip install pytest pytest-cov flake8
-
-# 環境変数の設定
-export GOOGLE_API_KEY="your-api-key"  # LinuxまたはmacOS
-# または
-# set GOOGLE_API_KEY=your-api-key  # Windows
 ```
 
-### 開発サーバーの起動
+### 2. 仮想環境のセットアップ
+
+```bash
+python -m venv venv
+source venv/bin/activate  # Linuxの場合
+venv\Scripts\activate     # Windowsの場合
+```
+
+### 3. 依存パッケージのインストール
+
+```bash
+pip install -e .
+# または
+pip install -r requirements.txt
+```
+
+### 4. 環境設定
+
+`.env.example`ファイルを`.env`にコピーし、必要な設定を行います：
+
+```bash
+cp .env.example .env
+```
+
+`.env`ファイルを編集して、Google API Keyなどを設定します。
+
+## 使用方法
+
+### 1. YouTubeデータの抽出
+
+```bash
+python youtube_data_extractor.py
+```
+
+これにより`data/shuwaemon_news_data.xlsx`が作成されます。
+
+### 2. 記事生成（CLI）
+
+```bash
+python gemini_article_generator.py "キーワード" --temp 0.7
+```
+
+オプション：
+- `--file` : データファイルのパス指定（デフォルト: data/shuwaemon_news_data.xlsx）
+- `--temp` : 生成の多様性（0.0-1.0の間、デフォルト: 0.7）
+
+### 3. WebアプリケーションでのUI起動
 
 ```bash
 uvicorn app:app --reload
 ```
 
-アプリケーションは `http://localhost:8000` で実行されます。
+ブラウザで http://localhost:8000 にアクセスします。
 
-## テスト
+## ディレクトリ構造
 
-```bash
-# 単体テストの実行
-pytest
-
-# カバレッジレポート付きテスト
-pytest --cov=. --cov-report=term
+```
+shuwaemon-news-generator/
+├── app.py                      # FastAPI Webアプリケーション
+├── gemini_article_generator.py # CLI版記事生成ツール
+├── youtube_data_extractor.py   # YouTubeデータ抽出ツール
+├── setup.py                    # パッケージ設定
+├── requirements.txt            # 依存パッケージリスト
+├── lib/                        # 共通ライブラリ
+│   ├── __init__.py
+│   ├── gemini_client.py        # Gemini API関連コード
+│   └── data_utils.py           # データ処理関連コード
+├── tests/                      # テストコード
+├── static/                     # 静的ファイル
+├── templates/                  # HTMLテンプレート
+├── data/                       # データファイル保存ディレクトリ
+└── generated_articles/         # 生成された記事の保存先
 ```
 
-## デプロイ
+## 環境設定（.env）
 
-このアプリケーションはGitHub Actionsを使用して[Render.com](https://render.com)に自動デプロイされます。
+```
+# Google API Key (Gemini API と YouTube API の両方に使用)
+GOOGLE_API_KEY=your_api_key_here
 
-1. Renderでウェブサービスを作成
-2. 環境変数`GOOGLE_API_KEY`を設定
-3. GitHubリポジトリの`Secrets`に以下を設定:
-   - `RENDER_API_KEY`: RenderのAPIキー
-   - `RENDER_SERVICE_ID`: デプロイするサービスのID
+# 認証設定 (オプション - デフォルトは admin/password)
+AUTH_USERNAME=admin
+AUTH_PASSWORD=secure_password
+```
 
-## 使用技術
+## API使用量とコスト
 
-- FastAPI - 高速なウェブフレームワーク
-- Jinja2 - テンプレートエンジン
-- Google Gemini API - AIテキスト生成
-- Pandas - データ処理
-- pytest - テスト自動化
-- GitHub Actions - CI/CD
+このシステムはGemini 2.0 Flash Lite APIを使用しています。料金は以下の通りです：
+
+- 入力トークン: $0.0003 / 1000トークン
+- 出力トークン: $0.0006 / 1000トークン
+
+API使用履歴は`api_usage_history.json`に保存され、WebUIでも確認できます。
 
 ## ライセンス
 
 MIT
 
-## 作者
+## 謝辞
 
-Makoto Nozaki
+- [Google Gemini API](https://ai.google.dev/)
+- [YouTube Data API](https://developers.google.com/youtube/v3)
+- [FastAPI](https://fastapi.tiangolo.com/)

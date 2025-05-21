@@ -26,7 +26,7 @@ wheels/
 .coverage
 htmlcov/
 generated_articles/
-shuwaimon_news_data.xlsx
 api_usage_history.json
 youtube_data_extractor.py
 gemini_article_generator.py
+data/*.xlsx

@@ -3,20 +3,30 @@
 FastAPIを使ったGUI実装
 """
 import os
+from dotenv import load_dotenv
 import json
 import time
-import pandas as pd
 from datetime import datetime
 from typing import List, Optional
 from pathlib import Path
 
-import google.generativeai as genai
+# 環境変数のロード（開発環境用）
+load_dotenv()
+
 from fastapi import FastAPI, Request, Form, HTTPException, Depends
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
+
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi import Depends, HTTPException, status
+from secrets import compare_digest
+
+# 共通ライブラリのインポート
+from lib.gemini_client import initialize_genai, generate_article, MODEL_NAME
+from lib.data_utils import load_excel_data, find_relevant_content, create_prompt, get_keyword_suggestions
 
 # アプリケーション設定
 APP_TITLE = "しゅわえもんニュース生成システム"
@@ -26,7 +36,24 @@ OUTPUT_DIR = "generated_articles"        # 生成記事の保存ディレクト�
 
 # Gemini API設定
 API_KEY = os.environ.get("GOOGLE_API_KEY")
-MODEL_NAME = "gemini-1.5-pro"  # または "gemini-1.0-pro"など他のモデル
+
+# 認証機能設定
+security = HTTPBasic()
+
+# 環境変数からユーザー名とパスワードを取得
+AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "admin")
+AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "password")
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = compare_digest(credentials.username, AUTH_USERNAME)
+    correct_password = compare_digest(credentials.password, AUTH_PASSWORD)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="認証に失敗しました",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # ライフスパン定義 - FastAPIアプリの初期化前に配置
 @asynccontextmanager
@@ -56,7 +83,7 @@ Path("static").mkdir(exist_ok=True)
 
 # Gemini APIの初期化
 if API_KEY:
-    genai.configure(api_key=API_KEY)
+    initialize_genai(API_KEY)
 else:
     print("警告: GOOGLE_API_KEY環境変数が設定されていません")
 
@@ -76,21 +103,6 @@ class APIUsageHistory(BaseModel):
     history: List[APIUsage] = []
     total_cost: float = 0.0
 
-# API料金計算（Gemini 1.5 Proの場合）
-def calculate_cost(input_tokens: int, output_tokens: int) -> float:
-    """
-    Gemini APIの使用コストを計算
-    注: 料金は変更される可能性があるため公式ドキュメントを参照してください
-    """
-    # Gemini 1.5 Proの料金（2025年5月現在）
-    input_cost_per_1k = 0.0025  # $0.0025 per 1K input tokens
-    output_cost_per_1k = 0.0075  # $0.0075 per 1K output tokens
-    
-    input_cost = (input_tokens / 1000) * input_cost_per_1k
-    output_cost = (output_tokens / 1000) * output_cost_per_1k
-    
-    return input_cost + output_cost
-
 # 使用履歴の読み込みと保存
 def load_api_usage_history() -> APIUsageHistory:
     """API使用履歴をロード"""
@@ -109,99 +121,6 @@ def save_api_usage(history: APIUsageHistory):
     with open(HISTORY_FILE, "w") as f:
         json.dump(history.model_dump(), f, indent=2)
 
-# Excelデータの読み込み
-def load_excel_data():
-    """データファイルからExcelデータを読み込む"""
-    try:
-        if os.path.exists(DATA_FILE):
-            return pd.read_excel(DATA_FILE)
-        else:
-            print(f"警告: データファイル '{DATA_FILE}' が見つかりません")
-            return pd.DataFrame()
-    except Exception as e:
-        print(f"Excelファイルの読み込みエラー: {e}")
-        return pd.DataFrame()
-
-# キーワード関連の関数
-def get_keyword_suggestions(df: pd.DataFrame, limit: int = 10) -> List[str]:
-    """
-    データフレームからキーワード候補を抽出
-    """
-    if df.empty:
-        return []
-    
-    # タイトルから単語を抽出
-    all_words = []
-    for title in df['title'].fillna(''):
-        if not isinstance(title, str):
-            continue
-        # 最低2文字以上の単語を抽出
-        words = [word for word in title.split() if len(word) >= 2]
-        all_words.extend(words)
-    
-    # 出現頻度でソート
-    word_counts = pd.Series(all_words).value_counts()
-    return word_counts.index.tolist()[:limit]
-
-def find_relevant_content(df: pd.DataFrame, keyword: str, num_samples: int = 5):
-    """キーワードに関連する内容をデータフレームから検索"""
-    if df.empty:
-        return pd.DataFrame()
-        
-    # NaN値を空文字列に置換
-    df_clean = df.fillna('')
-    
-    # キーワードを含む行を抽出
-    keyword_lower = keyword.lower()
-    mask = (
-        df_clean['title'].str.lower().str.contains(keyword_lower) | 
-        df_clean['description'].str.lower().str.contains(keyword_lower)
-    )
-    relevant_df = df_clean[mask]
-    
-    if len(relevant_df) == 0:
-        # 関連コンテンツがない場合はランダムサンプル
-        return df_clean.sample(min(num_samples, len(df_clean)))
-    
-    # 関連コンテンツのサンプルを返す
-    return relevant_df.sample(min(num_samples, len(relevant_df)))
-
-# 記事生成関数
-def create_prompt(keyword: str, examples_df: pd.DataFrame) -> str:
-    """Gemini APIへのプロンプトを作成"""
-    # 例を整形
-    examples_text = ""
-    for i, row in examples_df.iterrows():
-        examples_text += f"タイトル: {row['title']}\n"
-        examples_text += f"概要: {row['description']}\n\n"
-    
-    # プロンプトテンプレート
-    prompt = f"""
-あなたは「しゅわえもんニュース」というYouTubeチャンネルの記事を書くライターです。
-以下の特徴を持つニュース記事を日本語で作成してください:
-
-1. キーワード「{keyword}」に関する最新のニュース記事
-2. しゅわえもんニュースのスタイルで書かれた
-3. 事実ベースで読者が理解しやすい文章
-4. 見出し、導入部、本文、結論という構成
-
-以下はしゅわえもんニュースの例です:
-
-{examples_text}
-
-これらの例を参考にして、「{keyword}」についての記事を作成してください。
-記事のフォーマットは以下の通りです:
-
-[タイトル]
-
-[導入部 - キーワードについての簡単な紹介と記事の概要]
-
-[本文 - キーワードに関する詳細な内容]
-
-[結論 - 要点のまとめと今後の展望]
-"""
-    return prompt
-
 async def generate_article_with_gemini(keyword: str, temperature: float = 0.7) -> tuple:
     """
     Gemini APIを使用して記事を生成し、トークン使用量を返す
@@ -211,7 +130,7 @@ async def generate_article_with_gemini(keyword: str, temperature: float = 0.7) -
         
     try:
         # データフレームの読み込み
-        df = load_excel_data()
+        df = load_excel_data(DATA_FILE)
         if df.empty:
             raise HTTPException(status_code=404, detail=f"データファイル '{DATA_FILE}' が空であるか存在しません")
         
@@ -221,28 +140,8 @@ async def generate_article_with_gemini(keyword: str, temperature: float = 0.7) -
         # プロンプトの作成
         prompt = create_prompt(keyword, relevant_content)
         
-        # モデルの設定
-        generation_config = {
-            "temperature": temperature,
-            "top_p": 0.95,
-            "top_k": 40,
-            "max_output_tokens": 4096,
-        }
-        
-        # モデルの作成と記事生成
-        model = genai.GenerativeModel(MODEL_NAME)
-        response = model.generate_content(prompt, generation_config=generation_config)
-        
-        # トークン数の取得（注: 実際のAPIレスポンスによっては異なる可能性があります）
-        # ここでは仮の実装として、単語数から概算しています
-        input_tokens = len(prompt.split())
-        output_tokens = len(response.text.split())
-        
-        # コスト計算
-        cost = calculate_cost(input_tokens, output_tokens)
-        
-        # 生成された記事とトークン情報を返す
-        return response.text, input_tokens, output_tokens, cost
+        # 記事生成（共通ライブラリを使用）
+        return generate_article(prompt, temperature)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"記事生成エラー: {str(e)}")
@@ -269,9 +168,9 @@ def get_api_usage_history():
 
 # ルート
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request, history: APIUsageHistory = Depends(get_api_usage_history)):
+async def index(request: Request, username: str = Depends(get_current_username), history: APIUsageHistory = Depends(get_api_usage_history)):
     # Excel データの読み込み
-    df = load_excel_data()
+    df = load_excel_data(DATA_FILE)
     
     # キーワード候補の取得
     keyword_suggestions = get_keyword_suggestions(df)

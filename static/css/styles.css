@@ -1,8 +1,8 @@
 /* --- 基本スタイル --- */
 :root {
-    --primary-color: #3f51b5;
-    --primary-dark: #303f9f;
-    --primary-light: #c5cae9;
+    --primary-color: #88C1E5;
+    --primary-dark: #5A9AC8;
+    --primary-light: #B5D7F0;
     --accent-color: #ff4081;
     --text-color: #333333;
     --text-light: #757575;
@@ -523,3 +523,12 @@ input[type="range"]::-webkit-slider-thumb {
         flex: 1;
     }
 }
+
+.header, .btn-primary, .card-header {
+  background-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  background-color: var(--primary-dark);
+}
+
