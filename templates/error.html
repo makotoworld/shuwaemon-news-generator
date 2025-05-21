@@ -1,0 +1,20 @@
+<!-- templates/error.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header error-header">
+        <h2><i class="fas fa-exclamation-triangle"></i> エラーが発生しました</h2>
+    </div>
+    <div class="card-body">
+        <div class="error-container">
+            <div class="error-code">{{ status_code }}</div>
+            <div class="error-message">{{ detail }}</div>
+            
+            <div class="error-actions">
+                <a href="/" class="btn primary-btn"><i class="fas fa-home"></i> ホームに戻る</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

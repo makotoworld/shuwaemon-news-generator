@@ -1,0 +1,23 @@
+# YouTube Data APIとデータ処理用パッケージ
+google-api-python-client>=2.100.0
+pandas>=2.0.0
+openpyxl>=3.1.2
+
+# ニュース生成モデル用パッケージ
+numpy>=1.24.0
+scikit-learn>=1.3.0
+tensorflow>=2.13.0
+
+# Google Gemini API用パッケージ
+google-generativeai>=0.3.0
+
+# FastAPIウェブアプリケーション用パッケージ
+fastapi>=0.104.0
+uvicorn>=0.24.0
+jinja2>=3.1.2
+python-multipart>=0.0.6
+
+# その他のユーティリティ
+matplotlib>=3.7.0  # 必要に応じてデータ可視化
+joblib>=1.3.0      # モデル保存用
+tqdm>=4.66.0       # 進捗表示用
