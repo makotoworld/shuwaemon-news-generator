@@ -86,6 +86,8 @@ shuwaemon-news-generator/
 ├── youtube_data_extractor.py   # YouTubeデータ抽出ツール
 ├── setup.py                    # パッケージ設定
 ├── requirements.txt            # 依存パッケージリスト
+├── start.sh                    # デプロイ用起動スクリプト
+├── Procfile                    # Render用プロセス定義
 ├── lib/                        # 共通ライブラリ
 │   ├── __init__.py
 │   ├── gemini_client.py        # Gemini API関連コード
@@ -108,6 +110,43 @@ AUTH_USERNAME=admin
 AUTH_PASSWORD=secure_password
 ```
 
+## デプロイ
+
+### Render.comへのデプロイ
+
+1. Renderアカウントを作成し、GitHubリポジトリを接続
+2. 環境変数を設定：
+   - `GOOGLE_API_KEY`: Google API Key
+   - `AUTH_USERNAME`: 認証用ユーザー名
+   - `AUTH_PASSWORD`: 認証用パスワード
+3. ビルドコマンド: `pip install -r requirements.txt`
+4. 起動コマンド: `./start.sh`
+
+### GitHub Actions CI/CD
+
+このプロジェクトはGitHub Actionsを使用した自動テストとデプロイを設定済みです：
+
+- プルリクエスト時: 自動テスト実行
+- mainブランチへのプッシュ時: テスト実行後、Renderへ自動デプロイ
+
+必要なGitHub Secrets：
+- `GOOGLE_API_KEY`: Google API Key
+- `RENDER_API_KEY`: Render API Key
+- `RENDER_SERVICE_ID`: RenderサービスID
+
+## テスト
+
+```bash
+# 全テスト実行
+python -m pytest
+
+# カバレッジ付きテスト実行
+python -m pytest --cov=. --cov-report=html
+
+# 特定のテストファイル実行
+python -m pytest tests/test_app.py -v
+```
+
 ## API使用量とコスト
 
 このシステムはGemini 2.0 Flash Lite APIを使用しています。料金は以下の通りです：
@@ -116,6 +155,33 @@ AUTH_PASSWORD=secure_password
 - 出力トークン: $0.0006 / 1000トークン
 
 API使用履歴は`api_usage_history.json`に保存され、WebUIでも確認できます。
+
+## トラブルシューティング
+
+### ModuleNotFoundError: No module named 'lib'
+
+このエラーが発生した場合：
+
+1. プロジェクトルートに`__init__.py`ファイルがあることを確認
+2. `PYTHONPATH`環境変数を設定：
+   ```bash
+   export PYTHONPATH="${PYTHONPATH}:$(pwd)"
+   ```
+3. パッケージをeditable modeでインストール：
+   ```bash
+   pip install -e .
+   ```
+
+### GitHub Actionsでのテスト失敗
+
+- `pytest.ini`に`pythonpath = .`が設定されていることを確認
+- GitHub Actionsワークフローで`PYTHONPATH`環境変数が設定されていることを確認
+
+### Renderでのデプロイ失敗
+
+- `start.sh`ファイルに実行権限があることを確認
+- `Procfile`が正しく設定されていることを確認
+- 環境変数が正しく設定されていることを確認
 
 ## ライセンス
 
