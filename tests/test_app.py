@@ -3,6 +3,11 @@
 pytest を使用してアプリケーションの機能をテスト
 """
 import os
+import sys
+
+# プロジェクトのルートディレクトリをPythonパスに追加
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import pytest
 import pandas as pd
 from fastapi.testclient import TestClient
