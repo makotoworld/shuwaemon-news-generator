@@ -1,0 +1,55 @@
+<!-- templates/article_view.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-newspaper"></i> 記事内容</h2>
+        <div class="card-actions">
+            <a href="/history" class="btn secondary-btn">
+                <i class="fas fa-arrow-left"></i> 履歴に戻る
+            </a>
+            <a href="/download/{{ filename }}" class="btn primary-btn">
+                <i class="fas fa-download"></i> ダウンロード
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="article-info">
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">キーワード</div>
+                    <div class="info-value">{{ keyword }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">生成日時</div>
+                    <div class="info-value">{{ formatted_date }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">ファイル名</div>
+                    <div class="info-value">{{ filename }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="article-content-container">
+            <h3><i class="fas fa-file-alt"></i> 記事内容</h3>
+            <div class="article-content">{{ article_content }}</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 記事内容のコピー機能
+    function copyArticleContent() {
+        const content = document.querySelector('.article-content').textContent;
+        navigator.clipboard.writeText(content).then(function () {
+            alert('記事内容をクリップボードにコピーしました');
+        }, function (err) {
+            console.error('コピーに失敗しました: ', err);
+        });
+    }
+</script>
+{% endblock %}

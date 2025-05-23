@@ -25,7 +25,7 @@ from fastapi import Depends, HTTPException, status
 from secrets import compare_digest
 
 # 共通ライブラリのインポート
-from lib.gemini_client import initialize_genai, generate_article, MODEL_NAME
+from lib.llm_client import get_llm_manager, LLMProvider
 from lib.data_utils import load_excel_data, find_relevant_content, create_prompt, get_keyword_suggestions
 
 # アプリケーション設定
@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
         print(f"警告: データファイル '{DATA_FILE}' が見つかりません")
     if not API_KEY:
         print("警告: GOOGLE_API_KEY環境変数が設定されていません")
-    
+
     yield
 
 # FastAPIアプリケーション初期化
@@ -81,11 +81,8 @@ templates = Jinja2Templates(directory="templates")
 Path(OUTPUT_DIR).mkdir(exist_ok=True)
 Path("static").mkdir(exist_ok=True)
 
-# Gemini APIの初期化
-if API_KEY:
-    initialize_genai(API_KEY)
-else:
-    print("警告: GOOGLE_API_KEY環境変数が設定されていません")
+# LLMマネージャーの初期化
+llm_manager = get_llm_manager()
 
 # データモデル
 class ArticleRequest(BaseModel):
@@ -113,7 +110,7 @@ def load_api_usage_history() -> APIUsageHistory:
                 return APIUsageHistory(**data)
         except Exception as e:
             print(f"履歴ファイルの読み込みエラー: {e}")
-    
+
     return APIUsageHistory()
 
 def save_api_usage(history: APIUsageHistory):
@@ -121,28 +118,29 @@ def save_api_usage(history: APIUsageHistory):
     with open(HISTORY_FILE, "w") as f:
         json.dump(history.model_dump(), f, indent=2)
 
-async def generate_article_with_gemini(keyword: str, temperature: float = 0.7) -> tuple:
+def generate_article_with_llm(keyword: str, temperature: float = 0.7, provider: Optional[LLMProvider] = None) -> tuple:
     """
-    Gemini APIを使用して記事を生成し、トークン使用量を返す
+    LLMを使用して記事を生成し、トークン使用量を返す
     """
-    if not API_KEY:
-        raise HTTPException(status_code=500, detail="Google API Keyが設定されていません")
-        
     try:
         # データフレームの読み込み
         df = load_excel_data(DATA_FILE)
         if df.empty:
             raise HTTPException(status_code=404, detail=f"データファイル '{DATA_FILE}' が空であるか存在しません")
-        
+
         # 関連コンテンツの検索
         relevant_content = find_relevant_content(df, keyword)
-        
+
         # プロンプトの作成
         prompt = create_prompt(keyword, relevant_content)
+
+        # 記事生成（LLMマネージャーを使用）
+        article, input_tokens, output_tokens, cost, used_provider = llm_manager.generate_article(
+            prompt, temperature, provider
+        )
         
-        # 記事生成（共通ライブラリを使用）
-        return generate_article(prompt, temperature)
-    
+        return article, input_tokens, output_tokens, cost, used_provider
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"記事生成エラー: {str(e)}")
 
@@ -153,7 +151,7 @@ def save_generated_article(keyword: str, article: str) -> str:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{keyword.replace(' ', '_')}_{timestamp}.txt"
     filepath = os.path.join(OUTPUT_DIR, filename)
-    
+
     try:
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(article)
@@ -171,36 +169,54 @@ def get_api_usage_history():
 async def index(request: Request, username: str = Depends(get_current_username), history: APIUsageHistory = Depends(get_api_usage_history)):
     # Excel データの読み込み
     df = load_excel_data(DATA_FILE)
-    
+
     # キーワード候補の取得
     keyword_suggestions = get_keyword_suggestions(df)
     
+    # 利用可能なLLMプロバイダーの取得
+    available_providers = llm_manager.get_available_providers()
+    
+    # プロバイダー情報の整理
+    provider_info = {
+        "gemini": {"name": "Google Gemini", "model": "gemini-2.0-flash-lite", "available": available_providers.get("gemini", False)},
+        "openai": {"name": "OpenAI GPT", "model": "gpt-4o-mini", "available": available_providers.get("openai", False)},
+        "anthropic": {"name": "Anthropic Claude", "model": "claude-3-haiku", "available": available_providers.get("anthropic", False)}
+    }
+
     return templates.TemplateResponse(
         request,
         "index.html",
         {
-            "request": request, 
+            "request": request,
             "title": APP_TITLE,
             "keyword_suggestions": keyword_suggestions,
             "history": history.history,
-            "total_cost": history.total_cost
+            "total_cost": history.total_cost,
+            "provider_info": provider_info,
+            "available_providers": available_providers
         }
     )
 
 @app.post("/generate")
-async def generate_article(
+async def generate_article_endpoint(
     request: Request,
     keyword: str = Form(...),
     temperature: float = Form(0.7),
+    provider: Optional[str] = Form(None),
     history: APIUsageHistory = Depends(get_api_usage_history)
 ):
     try:
-        # 記事の生成
-        article, input_tokens, output_tokens, cost = await generate_article_with_gemini(keyword, temperature)
+        # プロバイダーの型変換
+        llm_provider = None
+        if provider and provider in ["gemini", "openai", "anthropic"]:
+            llm_provider = provider
         
+        # 記事の生成
+        article, input_tokens, output_tokens, cost, used_provider = generate_article_with_llm(keyword, temperature, llm_provider)
+
         # ファイルに保存
         filepath = save_generated_article(keyword, article)
-        
+
         # API使用履歴の更新
         usage = APIUsage(
             timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -209,16 +225,16 @@ async def generate_article(
             tokens_output=output_tokens,
             cost=cost
         )
-        
+
         history.history.append(usage)
         history.total_cost += cost
         save_api_usage(history)
-        
+
         # 出力を整形（HTMLで表示するため）
         formatted_article = article.replace("\n", "<br>")
-        
+
         return templates.TemplateResponse(
-            "result.html", 
+            "result.html",
             {
                 "request": request,
                 "title": APP_TITLE,
@@ -231,13 +247,14 @@ async def generate_article(
                 "tokens_output": output_tokens,
                 "cost": cost,
                 "total_cost": history.total_cost,
-                "filename": os.path.basename(filepath)
+                "filename": os.path.basename(filepath),
+                "provider": used_provider
             }
         )
-    
+
     except HTTPException as e:
         return templates.TemplateResponse(
-            "error.html", 
+            "error.html",
             {
                 "request": request,
                 "title": APP_TITLE,
@@ -247,7 +264,7 @@ async def generate_article(
         )
     except Exception as e:
         return templates.TemplateResponse(
-            "error.html", 
+            "error.html",
             {
                 "request": request,
                 "title": APP_TITLE,
@@ -260,13 +277,13 @@ async def generate_article(
 async def download_article(filename: str):
     """生成された記事をダウンロード"""
     filepath = os.path.join(OUTPUT_DIR, filename)
-    
+
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="ファイルが見つかりません")
-    
+
     return FileResponse(
-        filepath, 
-        media_type="text/plain", 
+        filepath,
+        media_type="text/plain",
         filename=filename
     )
 
@@ -274,14 +291,52 @@ async def download_article(filename: str):
 async def view_history(request: Request, history: APIUsageHistory = Depends(get_api_usage_history)):
     """API使用履歴の表示"""
     return templates.TemplateResponse(
-        "history.html", 
+        "history.html",
         {
             "request": request,
-            "title": APP_TITLE, 
+            "title": APP_TITLE,
             "history": history.history,
             "total_cost": history.total_cost
         }
     )
+
+@app.get("/view-article/{filename}")
+async def view_article(request: Request, filename: str):
+    """生成された記事の内容を表示"""
+    filepath = os.path.join(OUTPUT_DIR, filename)
+    
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="記事ファイルが見つかりません")
+    
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            article_content = f.read()
+        
+        # ファイル名からキーワードと日時を抽出
+        base_name = os.path.splitext(filename)[0]
+        parts = base_name.split('_')
+        if len(parts) >= 3:
+            keyword = '_'.join(parts[:-2])
+            date_part = parts[-2]
+            time_part = parts[-1]
+            formatted_date = f"{date_part[:4]}/{date_part[4:6]}/{date_part[6:8]} {time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
+        else:
+            keyword = base_name
+            formatted_date = "不明"
+        
+        return templates.TemplateResponse(
+            "article_view.html",
+            {
+                "request": request,
+                "title": APP_TITLE,
+                "keyword": keyword,
+                "article_content": article_content,
+                "filename": filename,
+                "formatted_date": formatted_date
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"記事の読み込みエラー: {str(e)}")
 
 @app.get("/clear-history")
 async def clear_history(request: Request):
@@ -289,12 +344,12 @@ async def clear_history(request: Request):
     # 履歴を新規作成
     new_history = APIUsageHistory()
     save_api_usage(new_history)
-    
+
     return templates.TemplateResponse(
-        "history.html", 
+        "history.html",
         {
             "request": request,
-            "title": APP_TITLE, 
+            "title": APP_TITLE,
             "history": [],
             "total_cost": 0.0,
             "message": "履歴がクリアされました"
@@ -303,6 +358,6 @@ async def clear_history(request: Request):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # 開発サーバー起動
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

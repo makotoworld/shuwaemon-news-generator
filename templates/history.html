@@ -15,7 +15,7 @@
         {% if message %}
         <div class="alert success">{{ message }}</div>
         {% endif %}
-        
+
         <div class="summary-stats">
             <div class="stat-item highlight">
                 <div class="stat-label">合計コスト</div>
@@ -26,7 +26,7 @@
                 <div class="stat-value">{{ history|length }}</div>
             </div>
         </div>
-        
+
         {% if history %}
         <div class="table-container">
             <table class="data-table">
@@ -37,6 +37,7 @@
                         <th>入力トークン</th>
                         <th>出力トークン</th>
                         <th>コスト</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -47,6 +48,13 @@
                         <td>{{ item.tokens_input }}</td>
                         <td>{{ item.tokens_output }}</td>
                         <td>${{ "%.4f"|format(item.cost) }}</td>
+                        <td>
+                            {% set filename = item.keyword.replace(' ', '_') + '_' + item.timestamp.replace('-',
+                            '').replace(' ', '_').replace(':', '') + '.txt' %}
+                            <a href="/view-article/{{ filename }}" class="btn-link" title="記事内容を表示">
+                                <i class="fas fa-eye"></i> 表示
+                            </a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>

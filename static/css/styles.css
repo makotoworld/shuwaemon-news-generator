@@ -133,7 +133,8 @@ footer {
     align-items: center;
 }
 
-.card-header h2, .card-header h3 {
+.card-header h2,
+.card-header h3 {
     margin: 0;
     font-size: 1.25rem;
     color: var(--text-dark);
@@ -256,9 +257,16 @@ input[type="range"]::-webkit-slider-thumb {
     color: white;
 }
 
-.primary-btn:hover {
+.primary-btn:hover:not(:disabled) {
     background-color: var(--primary-dark);
     color: white;
+}
+
+.btn:disabled,
+.btn-disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 .secondary-btn {
@@ -364,7 +372,8 @@ input[type="range"]::-webkit-slider-thumb {
     border-collapse: collapse;
 }
 
-.data-table th, .data-table td {
+.data-table th,
+.data-table td {
     padding: 12px 15px;
     text-align: left;
     border-bottom: 1px solid var(--border-color);
@@ -465,6 +474,12 @@ input[type="range"]::-webkit-slider-thumb {
     margin-top: 20px;
 }
 
+.error-message {
+    color: var(--danger-color);
+    font-weight: 500;
+    margin-top: 10px;
+}
+
 /* --- アラート --- */
 .alert {
     padding: 15px;
@@ -496,39 +511,283 @@ input[type="range"]::-webkit-slider-thumb {
         flex-direction: column;
         gap: 10px;
     }
-    
+
     nav ul {
         margin-top: 10px;
     }
-    
+
     .generation-stats {
         grid-template-columns: 1fr;
     }
-    
+
     .stat-group {
         flex-direction: column;
     }
-    
+
     .result-header {
         flex-direction: column;
         align-items: flex-start;
         gap: 15px;
     }
-    
+
     .result-actions {
         width: 100%;
     }
-    
+
     .result-actions .btn {
         flex: 1;
     }
 }
 
-.header, .btn-primary, .card-header {
-  background-color: var(--primary-color);
+.header,
+.btn-primary,
+.card-header {
+    background-color: var(--primary-color);
 }
 
 .btn-primary:hover {
-  background-color: var(--primary-dark);
+    background-color: var(--primary-dark);
 }
 
+/* ローディング関連のスタイル */
+.loading-container {
+    text-align: center;
+    padding: 40px;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 50px;
+    height: 50px;
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #2c3e50;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+.loading-text {
+    font-size: 1.2em;
+    color: #2c3e50;
+    margin-bottom: 10px;
+}
+
+.loading-subtext {
+    color: #7f8c8d;
+    font-size: 0.9em;
+}
+
+/* ボタンのローディング状態 */
+.btn-loading {
+    opacity: 0.7;
+    cursor: not-allowed !important;
+}
+
+.btn-loading:hover {
+    transform: none !important;
+}
+
+/* アニメーション */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* フォームの無効化状態（オプション） */
+.form-disabled {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* プログレスバー */
+.progress-bar {
+    width: 200px;
+    height: 6px;
+    background-color: #ecf0f1;
+    border-radius: 3px;
+    margin: 20px auto;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #3498db;
+    width: 0%;
+    animation: progress 30s ease-in-out;
+}
+
+@keyframes progress {
+    0% {
+        width: 0%;
+    }
+
+    50% {
+        width: 70%;
+    }
+
+    100% {
+        width: 95%;
+    }
+}
+
+/* --- 記事表示ページ --- */
+.article-info {
+    margin-bottom: 30px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: var(--radius);
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.info-label {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: var(--text-dark);
+    font-weight: 600;
+}
+
+.article-content-container {
+    margin-top: 30px;
+}
+
+.article-content-container h3 {
+    margin-bottom: 15px;
+    color: var(--text-dark);
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 10px;
+}
+
+.article-content {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: var(--radius);
+    line-height: 1.8;
+    white-space: pre-line;
+    font-size: 1rem;
+    border-left: 4px solid var(--primary-color);
+}
+
+/* --- ボタンリンク --- */
+.btn-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    color: var(--primary-color);
+    text-decoration: none;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.btn-link:hover {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+}
+
+.btn-link i {
+    margin-right: 5px;
+}
+
+/* --- LLMプロバイダー選択 --- */
+.provider-select {
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    width: 100%;
+    background-color: white;
+    transition: border-color 0.3s ease;
+}
+
+.provider-select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(136, 193, 229, 0.2);
+}
+
+.provider-select option:disabled {
+    color: #999;
+    background-color: #f5f5f5;
+}
+
+.provider-status {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.provider-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background-color: #f9f9f9;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-indicator.available {
+    background-color: var(--success-color);
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.status-indicator.unavailable {
+    background-color: var(--text-light);
+}
+
+.provider-name {
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+    .provider-status {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .provider-item {
+        justify-content: flex-start;
+    }
+}

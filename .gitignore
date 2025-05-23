@@ -30,3 +30,4 @@ api_usage_history.json
 youtube_data_extractor.py
 gemini_article_generator.py
 data/*.xlsx
+.DS_Store*

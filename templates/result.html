@@ -10,7 +10,7 @@
             <a href="/" class="btn primary-btn"><i class="fas fa-plus"></i> 新規作成</a>
         </div>
     </div>
-    
+
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-file-alt"></i> 記事内容</h3>
@@ -19,7 +19,7 @@
             {{ article|safe }}
         </div>
     </div>
-    
+
     <div class="card">
         <div class="card-header">
             <h3><i class="fas fa-info-circle"></i> 生成情報</h3>
@@ -35,8 +35,12 @@
                         <div class="stat-label">多様性</div>
                         <div class="stat-value">{{ temperature }}</div>
                     </div>
+                    <div class="stat-item">
+                        <div class="stat-label">使用プロバイダー</div>
+                        <div class="stat-value">{{ provider|upper }}</div>
+                    </div>
                 </div>
-                
+
                 <div class="stat-group">
                     <div class="stat-item">
                         <div class="stat-label">入力トークン</div>
@@ -47,7 +51,7 @@
                         <div class="stat-value">{{ tokens_output }}</div>
                     </div>
                 </div>
-                
+
                 <div class="stat-group">
                     <div class="stat-item highlight">
                         <div class="stat-label">推定コスト</div>

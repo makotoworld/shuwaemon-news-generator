@@ -7,7 +7,7 @@
         <h2><i class="fas fa-newspaper"></i> 記事生成</h2>
     </div>
     <div class="card-body">
-        <form action="/generate" method="post" class="article-form">
+        <form action="/generate" method="post" class="article-form" id="generateForm">
             <div class="form-group">
                 <label for="keyword">キーワード:</label>
                 <div class="input-with-suggestions">
@@ -24,7 +24,29 @@
                     {% endif %}
                 </div>
             </div>
-            
+
+            <div class="form-group">
+                <label for="provider">LLMプロバイダー:</label>
+                <select id="provider" name="provider" class="provider-select">
+                    <option value="">自動選択</option>
+                    {% for key, info in provider_info.items() %}
+                    <option value="{{ key }}" {% if not info.available %}disabled{% endif %}>
+                        {{ info.name }} ({{ info.model }})
+                        {% if not info.available %} - 利用不可{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="provider-status">
+                    {% for key, info in provider_info.items() %}
+                    <div class="provider-item">
+                        <span
+                            class="status-indicator {% if info.available %}available{% else %}unavailable{% endif %}"></span>
+                        <span class="provider-name">{{ info.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
             <div class="form-group">
                 <label for="temperature">多様性 (0.1-1.0):</label>
                 <div class="range-container">
@@ -37,10 +59,24 @@
                     <span>創造的</span>
                 </div>
             </div>
-            
+
             <div class="form-actions">
-                <button type="submit" class="btn primary-btn"><i class="fas fa-magic"></i> 記事を生成</button>
+                <button type="submit" class="btn primary-btn" id="generateBtn">
+                    <i class="fas fa-magic"></i>
+                    <span id="btnText">記事を生成</span>
+                </button>
             </div>
+
+            <!-- ローディング表示にプログレスバーを追加 -->
+            <div id="loadingMessage" class="loading-container" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">記事を生成しています...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+                <p class="loading-subtext">しばらくお待ちください</p>
+            </div>
+
         </form>
     </div>
 </div>
@@ -70,13 +106,93 @@
 {% block scripts %}
 <script>
     // 温度表示の更新
-    document.getElementById('temperature').addEventListener('input', function() {
+    document.getElementById('temperature').addEventListener('input', function () {
         document.getElementById('temperature-value').textContent = this.value;
     });
-    
+
     // キーワード選択
     function selectKeyword(keyword) {
-        document.getElementById('keyword').value = keyword;
+        const keywordInput = document.getElementById('keyword');
+        keywordInput.value = keyword;
+
+        // ボタン状態を更新（DOMContentLoaded後に実行される場合のため）
+        if (window.updateButtonState) {
+            window.updateButtonState();
+        }
     }
+
+    // フォーム送信時の処理（修正版）
+    document.addEventListener('DOMContentLoaded', function () {
+        const generateForm = document.getElementById('generateForm');
+        const generateBtn = document.getElementById('generateBtn');
+        const btnText = document.getElementById('btnText');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const keywordInput = document.getElementById('keyword');
+
+        if (generateForm && generateBtn && btnText && loadingMessage && keywordInput) {
+            // キーワード入力の監視
+            function updateButtonState() {
+                const keyword = keywordInput.value.trim();
+                if (keyword === '') {
+                    generateBtn.disabled = true;
+                    generateBtn.classList.add('btn-disabled');
+                } else {
+                    generateBtn.disabled = false;
+                    generateBtn.classList.remove('btn-disabled');
+                }
+            }
+
+            // グローバルスコープに関数を公開
+            window.updateButtonState = updateButtonState;
+
+            // 初期状態の設定
+            updateButtonState();
+
+            // キーワード入力時のリアルタイム監視
+            keywordInput.addEventListener('input', updateButtonState);
+            keywordInput.addEventListener('keyup', updateButtonState);
+            keywordInput.addEventListener('paste', function () {
+                setTimeout(updateButtonState, 10);
+            });
+
+            generateForm.addEventListener('submit', function (e) {
+                const keyword = keywordInput.value.trim();
+
+                // キーワードが空の場合は送信を阻止
+                if (keyword === '') {
+                    e.preventDefault();
+                    alert('キーワードを入力してください。');
+                    return false;
+                }
+
+                // ボタンを無効化
+                generateBtn.disabled = true;
+                generateBtn.classList.add('btn-loading');
+
+                // ボタンのテキストを変更
+                btnText.textContent = '生成中...';
+                generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>生成中...</span>';
+
+                // ローディングメッセージを表示
+                loadingMessage.style.display = 'block';
+
+                // フォーム全体を無効化（オプション）
+                generateForm.classList.add('form-disabled');
+
+                // タイムアウト処理（60秒後に再度有効化）
+                setTimeout(() => {
+                    if (generateBtn.disabled) {
+                        generateBtn.disabled = false;
+                        generateBtn.classList.remove('btn-loading');
+                        generateBtn.innerHTML = '<i class="fas fa-magic"></i> <span>記事を生成</span>';
+                        generateForm.classList.remove('form-disabled');
+                        loadingMessage.innerHTML = '<p class="error-message">タイムアウトしました。もう一度お試しください。</p>';
+                        updateButtonState(); // ボタン状態を再評価
+                    }
+                }, 60000);
+            });
+        }
+    });
+
 </script>
 {% endblock %}
