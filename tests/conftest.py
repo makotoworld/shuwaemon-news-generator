@@ -3,6 +3,13 @@ pytest用の共通設定とフィクスチャ
 新しいLLMクライアントシステムに対応
 """
 import os
+import sys
+
+# プロジェクトのルートディレクトリをPythonパスに追加
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 import pytest
 import pandas as pd
 from fastapi.testclient import TestClient
